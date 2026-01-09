@@ -1,4 +1,11 @@
 <p align="center">
+This is a modified version to work with unlimited document server
+It contains modified docker compose, Original one doesn't work
+It's modified to work with Masar project
+</p>
+<hr />
+
+<p align="center">
 	<a href="https://www.onlyoffice.com/"><img alt="https://www.onlyoffice.com/" width="500px" src="https://static-www.onlyoffice.com/images/logo_small.svg"></a>
 </p>
 <hr />
