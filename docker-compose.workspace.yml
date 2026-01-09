@@ -1,25 +1,35 @@
+name: fenix-onlyoffice  # This defines the Stack/Project name
+
 services:
   onlyoffice-mysql-server:
     container_name: onlyoffice-mysql-server
     image: mysql:8.0.29
+    # FIXED: Restored the required authentication plugin command
+    command: --default-authentication-plugin=mysql_native_password
     environment:
-     - MYSQL_ROOT_PASSWORD=my-secret-pw
+      - MYSQL_ROOT_PASSWORD=AuEfBpdfmJrXX1estYVxYzTAMVhbTNtY
+      # FIXED: Changed DB_... to MYSQL_... so the user is actually created
+      - MYSQL_DATABASE=onlyoffice
+      - MYSQL_USER=onlyoffice
+      - MYSQL_PASSWORD=onlyoffice_pass
+      # FIXED: Added Root Host to allow external root connections if needed
+      - MYSQL_ROOT_HOST=%
     networks:
-     - onlyoffice
+      - onlyoffice
     stdin_open: true
     tty: true
-    restart: always
+    restart: unless-stopped
     volumes:
      - ./config/mysql/conf.d:/etc/mysql/conf.d
      - ./config/mysql/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
      - mysql_data:/var/lib/mysql
+
   onlyoffice-community-server:
     container_name: onlyoffice-community-server
     image: onlyoffice/communityserver:12.6.0.1900
     depends_on:
      - onlyoffice-mysql-server
      - onlyoffice-document-server
-     - onlyoffice-mail-server
      - onlyoffice-elasticsearch
     environment:
      - ONLYOFFICE_CORE_MACHINEKEY=core_secret
@@ -29,29 +39,21 @@ services:
      - DOCUMENT_SERVER_JWT_ENABLED=true
      - DOCUMENT_SERVER_JWT_SECRET=jwt_secret
      - DOCUMENT_SERVER_JWT_HEADER=AuthorizationJwt
-     - MYSQL_SERVER_ROOT_PASSWORD=my-secret-pw
-     - MYSQL_SERVER_DB_NAME=onlyoffice
-     - MYSQL_SERVER_HOST=onlyoffice-mysql-server
-     - MYSQL_SERVER_USER=onlyoffice_user
-     - MYSQL_SERVER_PASS=onlyoffice_pass
-     - MAIL_SERVER_API_PORT=8081
-     - MAIL_SERVER_API_HOST=onlyoffice-mail-server
-     - MAIL_SERVER_DB_HOST=onlyoffice-mysql-server
-     - MAIL_SERVER_DB_PORT=3306
-     - MAIL_SERVER_DB_NAME=onlyoffice_mailserver
-     - MAIL_SERVER_DB_USER=mail_admin
-     - MAIL_SERVER_DB_PASS=Isadmin123
+     - DB_TYPE=mysql
+     - DB_HOST=onlyoffice-mysql-server
+     - DB_PORT=3306
+     - DB_NAME=onlyoffice
+     - DB_USER=onlyoffice
+     - DB_PWD=onlyoffice_pass     # Added password
+     
      - ELASTICSEARCH_SERVER_HOST=onlyoffice-elasticsearch
      - ELASTICSEARCH_SERVER_HTTPPORT=9200
     networks:
      - onlyoffice
-    ports:
-     - '80:80'
-     - '443:443'
-     - '5222:5222'
+     - backend-network
     stdin_open: true
     tty: true
-    restart: always
+    restart: unless-stopped
     privileged: true
     cgroup: host
     volumes:
@@ -61,10 +63,19 @@ services:
      - document_data:/var/www/onlyoffice/DocumentServerData
      - /sys/fs/cgroup:/sys/fs/cgroup:rw
      - ./certs:/var/www/onlyoffice/Data/certs
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.docspace.entrypoints=websecure"
+      - "traefik.http.routers.docspace.rule=Host(`office.bif.gov.iq`)"
+      - "traefik.http.routers.docspace.tls=true"
+      - "traefik.http.routers.docspace.tls.certresolver=cloudflare"
+      - "traefik.http.services.docspace.loadbalancer.server.port=80"
+      - "traefik.docker.network=backend-network"
+
   onlyoffice-elasticsearch:
     image: onlyoffice/elasticsearch:7.16.3
     container_name: onlyoffice-elasticsearch
-    restart: always
+    restart: unless-stopped
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
@@ -86,15 +97,16 @@ services:
     expose:
       - "9200"
       - "9300"
+
   onlyoffice-document-server:
     container_name: onlyoffice-document-server
-    image: onlyoffice/documentserver:8.1
+    image: ghcr.io/thomisus/onlyoffice-documentserver-unlimited:latest
     stdin_open: true
     tty: true
-    restart: always
+    restart: unless-stopped
     environment:
      - JWT_ENABLED=true
-     - JWT_SECRET=jwt_secret
+     - JWT_SECRET=PARZ8Rws2qWbA5dvA9u4cMbRThNfXpbjVVgVT6T1XAUWm693z5rN8ps6GCenmXpw
      - JWT_HEADER=AuthorizationJwt
     networks:
       - onlyoffice
@@ -106,45 +118,19 @@ services:
        - document_log:/var/log/onlyoffice
        - ./document_fonts:/usr/share/fonts/truetype/custom
        - document_forgotten:/var/lib/onlyoffice/documentserver/App_Data/cache/files/forgotten
-  onlyoffice-mail-server:
-    container_name: onlyoffice-mail-server
-    image: onlyoffice/mailserver:1.6.75
-    depends_on:
-      - onlyoffice-mysql-server
-    hostname: ${MAIL_SERVER_HOSTNAME}
-    environment:
-       - MYSQL_SERVER=onlyoffice-mysql-server
-       - MYSQL_SERVER_PORT=3306
-       - MYSQL_ROOT_USER=mail_admin
-       - MYSQL_ROOT_PASSWD=Isadmin123
-       - MYSQL_SERVER_DB_NAME=onlyoffice_mailserver
-    networks:
-      - onlyoffice
-    restart: always
-    privileged: true
-    ports: ['25:25','143:143','587:587']
-    stdin_open: true
-    tty: true
-    expose:
-      - '8081'
-      - '3306'
-    volumes:
-      - mail_data:/var/vmail
-      - mail_certs:/etc/pki/tls/mailserver
-      - mail_log:/var/log
+       
   onlyoffice-control-panel:
     container_name: onlyoffice-control-panel
     depends_on:
      - onlyoffice-document-server
-     - onlyoffice-mail-server
      - onlyoffice-community-server
     image: onlyoffice/controlpanel:3.5.2.530
     environment:
-     - ONLYOFFICE_CORE_MACHINEKEY=core_secret
+     - ONLYOFFICE_CORE_MACHINEKEY=j4eCAAmWhGRwkKeUvDrRGXUyH1pGhdnx
     expose:
       - '80'
       - '443'
-    restart: always
+    restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - controlpanel_data:/var/www/onlyoffice/Data
@@ -153,14 +139,14 @@ services:
       - onlyoffice
     stdin_open: true
     tty: true
+
 networks:
   onlyoffice:
     driver: 'bridge'
+  backend-network:
+    external: true
+
 volumes:
-  mail_data:
-  mail_certs:
-  mail_log:
-  mail_mysql:
   document_data:
   document_log:
   document_forgotten:
