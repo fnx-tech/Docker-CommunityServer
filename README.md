@@ -1,8 +1,8 @@
-<p align="center">
-This is a modified version to work with unlimited document server
-It contains modified docker compose, Original one doesn't work
-It's modified to work with Masar project
-</p>
+<div align="center">
+<h2>This is a modified version to work with unlimited document server</h2>
+<h2>It contains modified docker compose, Original one doesn't work</h2>
+<h2>It's modified to work with Masar project</h2>
+</div>
 <hr />
 
 <p align="center">
